@@ -49,11 +49,11 @@ export default function GameCanvas({ onShotComplete }) {
 
     // Load GK image
     const gkImage = new Image();
-    gkImage.src = '/Human.webp';
+    gkImage.src = './Human.webp';
 
     // Load Ball image
     const ballImage = new Image();
-    ballImage.src = '/BALL.webp';
+    ballImage.src = './BALL.webp';
 
     const resize = () => {
       canvas.width = window.innerWidth;

@@ -7,7 +7,7 @@ export default function GameContainer({ children }) {
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 stadium-vignette z-10"></div>
         <img 
-          src="/BG_GAME.jpeg"
+          src="./BG_GAME.jpeg"
           alt="Luxury Stadium at Night"
           className="w-full h-full object-cover animate-subtle-zoom"
         />
