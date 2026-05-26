@@ -1,0 +1,480 @@
+import React, { useRef, useEffect, useState } from 'react';
+
+export default function GameCanvas({ onShotComplete }) {
+  const canvasRef = useRef(null);
+  
+  // Game state
+  const state = useRef({
+    ball: {
+      x: 0,
+      y: 0,
+      baseY: 0,
+      altitude: 0,
+      radius: 40,
+      vx: 0,
+      vBaseY: 0,
+      vAltitude: 0,
+      scale: 1,
+      isFlying: false,
+      spin: 0,
+    },
+    goal: {
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      lineY: 0
+    },
+    gk: {
+      x: 0,
+      y: 0,
+      width: 105, // Slightly increased from 95 to cover more goal area
+      height: 135, // Slightly increased from 125
+      speed: 2, 
+    },
+    swipe: {
+      isDragging: false,
+      pts: [], // array of {x, y, time}
+    },
+    slowMotion: false,
+    result: null // 'goal' or 'save' or 'miss'
+  });
+
+  const [hintVisible, setHintVisible] = useState(true);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    let animationFrameId;
+
+    // Load GK image
+    const gkImage = new Image();
+    gkImage.src = '/Human.webp';
+
+    // Load Ball image
+    const ballImage = new Image();
+    ballImage.src = '/BALL.webp';
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      
+      // Reset ball position if not flying
+      if (!state.current.ball.isFlying) {
+        state.current.ball.x = canvas.width / 2;
+        state.current.ball.baseY = canvas.height - 150;
+        state.current.ball.altitude = 0;
+        state.current.ball.scale = 1;
+      }
+      
+      // Goal dimensions (Narrowed goal size to make scoring more challenging)
+      state.current.goal.width = Math.min(canvas.width * 0.65, 420);
+      state.current.goal.height = 190;
+      state.current.goal.x = canvas.width / 2;
+      state.current.goal.y = canvas.height * 0.35; // Lowered goal to be closer to center of screen
+      state.current.goal.lineY = state.current.goal.y + state.current.goal.height;
+      
+      // Reset GK
+      if (!state.current.ball.isFlying) {
+        state.current.gk.x = canvas.width / 2;
+        state.current.gk.y = state.current.goal.lineY - state.current.gk.height;
+      }
+    };
+    
+    window.addEventListener('resize', resize);
+    resize();
+
+    const drawGoal = (ctx, goal) => {
+      ctx.save();
+      // Goal posts
+      ctx.strokeStyle = '#e3e2e0'; // tertiary-fixed
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'square';
+      ctx.lineJoin = 'miter';
+      
+      const leftX = goal.x - goal.width / 2;
+      const rightX = goal.x + goal.width / 2;
+      const topY = goal.y;
+      const bottomY = goal.lineY;
+
+      // Draw shadow/glow
+      ctx.shadowColor = 'rgba(227,226,224,0.3)';
+      ctx.shadowBlur = 20;
+
+      // Posts and crossbar
+      ctx.beginPath();
+      ctx.moveTo(leftX, bottomY);
+      ctx.lineTo(leftX, topY);
+      ctx.lineTo(rightX, topY);
+      ctx.lineTo(rightX, bottomY);
+      ctx.stroke();
+
+      // Goal Net (perspective)
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 1;
+      
+      // Horizontal net lines
+      for(let i=1; i<=10; i++) {
+        const y = topY + (bottomY - topY) * (i/10);
+        ctx.beginPath();
+        // Perspective curve
+        ctx.moveTo(leftX + (i*2), y);
+        ctx.quadraticCurveTo(goal.x, y - 20, rightX - (i*2), y);
+        ctx.stroke();
+      }
+      // Vertical net lines
+      for(let i=1; i<=20; i++) {
+        const x = leftX + (goal.width) * (i/21);
+        ctx.beginPath();
+        ctx.moveTo(x, topY);
+        // Perspective inward
+        const targetX = goal.x + (x - goal.x) * 0.8;
+        ctx.lineTo(targetX, bottomY - 10);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    };
+
+    const drawGK = (ctx, gk) => {
+      if (!gkImage.complete) return;
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.8)';
+      ctx.shadowBlur = 15;
+      
+      let drawX = gk.x - gk.width / 2;
+      let drawY = gk.y;
+      
+      ctx.drawImage(gkImage, drawX, drawY, gk.width, gk.height);
+      ctx.restore();
+    };
+
+    const drawBall = (ctx, ball) => {
+      ctx.save();
+      const currentRadius = ball.radius * ball.scale;
+      
+      const screenY = ball.baseY - ball.altitude;
+      const shadowY = ball.baseY + currentRadius * 0.5;
+
+      // Drop shadow scaling with height
+      const shadowScale = Math.max(0.2, 1 - (ball.altitude / 300));
+      const shadowAlpha = Math.max(0.1, ball.scale * 0.5 * shadowScale);
+      
+      ctx.beginPath();
+      ctx.ellipse(ball.x, shadowY, currentRadius * 0.8 * shadowScale, currentRadius * 0.3 * shadowScale, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+      ctx.filter = `blur(${10 + (1-shadowScale)*20}px)`;
+      ctx.fill();
+      ctx.filter = 'none';
+
+      // Custom ball rendering
+      if (ballImage.complete) {
+        ctx.translate(ball.x, screenY);
+        // Simulate rolling by rotating context
+        const rollAngle = (ball.baseY) * 0.05; 
+        const spinAngle = ball.x * 0.02;
+        ctx.rotate(spinAngle + rollAngle);
+        
+        ctx.shadowColor = 'rgba(255, 215, 0, 0.3)';
+        ctx.shadowBlur = 10 * ball.scale;
+        
+        ctx.drawImage(ballImage, -currentRadius, -currentRadius, currentRadius * 2, currentRadius * 2);
+      } else {
+        // Fallback procedural ball
+        ctx.beginPath();
+        ctx.arc(ball.x, screenY, currentRadius, 0, Math.PI * 2);
+        
+        const grad = ctx.createRadialGradient(
+          ball.x - currentRadius*0.3, screenY - currentRadius*0.3, currentRadius*0.1,
+          ball.x, screenY, currentRadius
+        );
+        grad.addColorStop(0, '#fff6df');
+        grad.addColorStop(0.3, '#ffd700');
+        grad.addColorStop(0.8, '#e9c400');
+        grad.addColorStop(1, '#705e00');
+        
+        ctx.fillStyle = grad;
+        ctx.shadowColor = 'rgba(255, 215, 0, 0.6)';
+        ctx.shadowBlur = 20 * ball.scale;
+        ctx.fill();
+      }
+
+      ctx.restore();
+    };
+
+    const drawTrajectory = (ctx, pts, ball) => {
+      if (pts.length < 2) return;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)'; // gold dotted line
+      ctx.lineWidth = 4;
+      ctx.setLineDash([10, 10]);
+      ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
+      ctx.shadowBlur = 10;
+      
+      const startY = ball.baseY - ball.altitude;
+      
+      ctx.beginPath();
+      ctx.moveTo(ball.x, startY);
+      const currentPt = pts[pts.length - 1];
+      const startPt = pts[0];
+      const dx = currentPt.x - startPt.x;
+      const dy = currentPt.y - startPt.y;
+      
+      // Project the line forward
+      ctx.lineTo(ball.x + dx * 2, startY + dy * 2);
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    const render = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw atmospheric stadium lights on canvas
+      ctx.save();
+      const lightGrad = ctx.createRadialGradient(canvas.width/2, 100, 50, canvas.width/2, 200, 600);
+      lightGrad.addColorStop(0, 'rgba(255, 246, 223, 0.15)');
+      lightGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = lightGrad;
+      ctx.fillRect(0,0, canvas.width, canvas.height);
+      ctx.restore();
+
+      drawGoal(ctx, state.current.goal);
+      drawGK(ctx, state.current.gk);
+      
+      const st = state.current;
+      
+      if (st.swipe.isDragging) {
+        drawTrajectory(ctx, st.swipe.pts, st.ball);
+      }
+
+      // Physics update
+      if (st.ball.isFlying && !st.result) {
+        // Slow motion near goal
+        const timeScale = st.slowMotion ? 0.3 : 1;
+        
+        // Apply Magnus effect (curve) to horizontal velocity (slowed down curve acceleration)
+        st.ball.vx += st.ball.spin * 0.15 * timeScale;
+        
+        // Update positions
+        st.ball.x += st.ball.vx * timeScale;
+        st.ball.baseY += st.ball.vBaseY * timeScale; // Moves "into" the screen
+        
+        // Gravity effect on altitude
+        st.ball.vAltitude -= 0.6 * timeScale; // Gravity
+        st.ball.altitude += st.ball.vAltitude * timeScale;
+        
+        // Bounce off the ground
+        if (st.ball.altitude < 0) {
+          st.ball.altitude = 0;
+          st.ball.vAltitude = Math.abs(st.ball.vAltitude) * 0.4; // Bounce dampening
+        }
+        
+        // Perspective scaling
+        const startY = canvas.height - 150;
+        const travelDistance = startY - st.goal.lineY;
+        const currentTravel = startY - st.ball.baseY;
+        const travelRatio = Math.max(0, Math.min(1.2, currentTravel / travelDistance));
+        st.ball.scale = Math.max(0.3, 1 - (travelRatio * 0.6));
+
+        // AI Goalkeeper Logic
+        // Move towards the ball's predicted X, but limit speed
+        const gkTargetX = st.ball.x;
+        const gkDist = gkTargetX - st.gk.x;
+        
+        // Ensure GK stays within goal posts
+        const leftLimit = st.goal.x - st.goal.width/2 + st.gk.width/2;
+        const rightLimit = st.goal.x + st.goal.width/2 - st.gk.width/2;
+
+        if (Math.abs(gkDist) > 5) {
+          st.gk.x += Math.sign(gkDist) * Math.min(Math.abs(gkDist), st.gk.speed * timeScale);
+        }
+        st.gk.x = Math.max(leftLimit, Math.min(rightLimit, st.gk.x));
+
+        // Goal & Save detection
+        if (st.ball.baseY <= st.goal.lineY) {
+          const leftX = st.goal.x - st.goal.width/2;
+          const rightX = st.goal.x + st.goal.width/2;
+          
+          // Check collision with GK
+          const hitGkX = Math.abs(st.ball.x - st.gk.x) < (st.gk.width/2 + st.ball.radius*st.ball.scale);
+          const hitGkY = st.ball.altitude < st.gk.height;
+
+          if (hitGkX && hitGkY) {
+            // SAVED!
+            st.result = 'save';
+            st.ball.vBaseY = Math.abs(st.ball.vBaseY) * 0.3; // Bounce back
+            st.ball.vAltitude = 5;
+            onShotComplete('save');
+            
+            setTimeout(() => {
+              resetBall(st, canvas);
+            }, 2000);
+
+          } else if (st.ball.x > leftX && st.ball.x < rightX && st.ball.altitude < st.goal.height) {
+            // GOAL! (Strict check: ball altitude must be strictly below crossbar/goal.height)
+            st.slowMotion = true;
+            st.result = 'goal';
+            onShotComplete('goal');
+            
+            setTimeout(() => {
+              resetBall(st, canvas);
+            }, 2000); 
+          } else {
+            // MISS!
+            st.result = 'miss';
+            onShotComplete('miss');
+            
+            setTimeout(() => {
+              resetBall(st, canvas);
+            }, 2000);
+          }
+        }
+      } else if (st.result) {
+        // Ball bounce/fall physics after result
+        st.ball.x += st.ball.vx * 0.5;
+        st.ball.baseY += st.ball.vBaseY * 0.5;
+        st.ball.vAltitude -= 0.6;
+        st.ball.altitude += st.ball.vAltitude;
+        if (st.ball.altitude < 0) {
+           st.ball.altitude = 0;
+           st.ball.vAltitude = Math.abs(st.ball.vAltitude) * 0.4;
+           st.ball.vx *= 0.8;
+        }
+      }
+
+      drawBall(ctx, st.ball);
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [onShotComplete]);
+
+  const resetBall = (st, canvas) => {
+    st.ball.isFlying = false;
+    st.ball.x = canvas.width / 2;
+    st.ball.baseY = canvas.height - 150;
+    st.ball.altitude = 0;
+    st.ball.scale = 1;
+    st.ball.vx = 0;
+    st.ball.vBaseY = 0;
+    st.ball.vAltitude = 0;
+    st.ball.spin = 0;
+    st.slowMotion = false;
+    st.result = null;
+    st.gk.x = canvas.width / 2;
+  };
+
+  // Input Handlers
+  const handlePointerDown = (e) => {
+    e.preventDefault(); 
+    if (state.current.ball.isFlying) return;
+    
+    setHintVisible(false);
+    
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    const screenY = state.current.ball.baseY - state.current.ball.altitude;
+    const dx = clientX - state.current.ball.x;
+    const dy = clientY - screenY;
+    if (Math.sqrt(dx*dx + dy*dy) < state.current.ball.radius * 3) {
+      state.current.swipe.isDragging = true;
+      state.current.swipe.pts = [{ x: clientX, y: clientY, time: Date.now() }];
+    }
+  };
+
+  const handlePointerMove = (e) => {
+    e.preventDefault();
+    if (!state.current.swipe.isDragging) return;
+    
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    state.current.swipe.pts.push({ x: clientX, y: clientY, time: Date.now() });
+    
+    if (state.current.swipe.pts.length > 15) {
+      state.current.swipe.pts.shift();
+    }
+  };
+
+  const handlePointerUp = (e) => {
+    if (!state.current.swipe.isDragging) return;
+    state.current.swipe.isDragging = false;
+    
+    const pts = state.current.swipe.pts;
+    if (pts.length < 2) return;
+    
+    const startPt = pts[0];
+    const endPt = pts[pts.length - 1];
+    
+    const dx = endPt.x - startPt.x;
+    const dy = endPt.y - startPt.y;
+    const dt = Math.max(1, endPt.time - startPt.time);
+    
+    if (dy > -20) return; 
+
+    // VERY SLOW SPEED
+    const speedY = Math.min(-3, Math.max(-12, (dy / dt) * 3));
+    const speedX = (dx / dt) * 2;
+
+    // Calculate curve (Magnus effect)
+    let spin = 0;
+    if (pts.length >= 3) {
+      let totalDev = 0;
+      const lineLen = Math.hypot(dx, dy);
+      
+      if (lineLen > 10) {
+        for (let i = 1; i < pts.length - 1; i++) {
+          const pt = pts[i];
+          const cross = (pt.x - startPt.x) * dy - (pt.y - startPt.y) * dx;
+          totalDev += cross / lineLen; 
+        }
+        const averageDev = totalDev / (pts.length - 2);
+        
+        // Gentle spin scaling to prevent crazy curved trajectories
+        spin = -(averageDev * 0.005); 
+        spin = Math.max(-0.12, Math.min(0.12, spin));
+      }
+    }
+    
+    state.current.ball.isFlying = true;
+    state.current.ball.vx = speedX;
+    state.current.ball.vBaseY = speedY; 
+    state.current.ball.vAltitude = Math.abs(speedY) * 0.9 + 5; 
+    state.current.ball.spin = spin;
+    
+    // Set GK speed (slower so it is beatable but slightly more alert)
+    state.current.gk.speed = 1.4 + Math.random() * 2.0;
+  };
+
+  return (
+    <>
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full z-0 cursor-crosshair touch-none"
+        onMouseDown={handlePointerDown}
+        onMouseMove={handlePointerMove}
+        onMouseUp={handlePointerUp}
+        onMouseLeave={handlePointerUp}
+        onTouchStart={handlePointerDown}
+        onTouchMove={handlePointerMove}
+        onTouchEnd={handlePointerUp}
+      />
+      {hintVisible && (
+        <div className="absolute bottom-[240px] left-1/2 -translate-x-1/2 pointer-events-none flex flex-col items-center">
+          <div className="animate-bounce flex flex-col items-center">
+            <span className="material-symbols-outlined text-primary text-4xl">keyboard_double_arrow_up</span>
+            <span className="font-label-caps text-primary-container text-[12px] mt-2">SWIPE TO STRIKE</span>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
