@@ -239,10 +239,10 @@ export default function GameCanvas({ onShotComplete }) {
         st.ball.vAltitude -= 0.38 * timeScale; // Balanced gravity decay
         st.ball.altitude += st.ball.vAltitude * timeScale;
         
-        // Bounce off the ground
+        // Bounce off the ground (slower, softer bounce on grass so it doesn't balloon back up)
         if (st.ball.altitude < 0) {
           st.ball.altitude = 0;
-          st.ball.vAltitude = Math.abs(st.ball.vAltitude) * 0.4; // Bounce dampening
+          st.ball.vAltitude = Math.abs(st.ball.vAltitude) * 0.12; // Grass dampening (reduced from 0.4)
         }
         
         // Perspective scaling
@@ -322,7 +322,7 @@ export default function GameCanvas({ onShotComplete }) {
         // Bounce on the grass inside the net or ground
         if (st.ball.altitude < 0) {
            st.ball.altitude = 0;
-           st.ball.vAltitude = Math.abs(st.ball.vAltitude) * 0.3; // Soft bounce
+           st.ball.vAltitude = Math.abs(st.ball.vAltitude) * 0.12; // Soft grass bounce (reduced from 0.3)
            st.ball.vx *= 0.65; // High grass friction
            st.ball.vBaseY *= 0.65;
         }
@@ -433,8 +433,8 @@ export default function GameCanvas({ onShotComplete }) {
     state.current.ball.vx = speedX;
     state.current.ball.vBaseY = speedY; 
     
-    // vAltitude for initial lob (creates the rise, gravity does the dip)
-    state.current.ball.vAltitude = Math.abs(speedY) * 1.35; 
+    // vAltitude for initial lob (Higher multiplier so hard kicks fly over the crossbar)
+    state.current.ball.vAltitude = Math.abs(speedY) * 1.85; 
     
     state.current.ball.spin = spin;
     
