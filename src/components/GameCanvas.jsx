@@ -31,6 +31,7 @@ export default function GameCanvas({ onShotComplete }) {
       y: 0,
       altitude: 0, // Added altitude for jumping
       vAltitude: 0,
+      hasJumped: false, // Added to ensure single jump
       width: 90, // Balanced goalkeeper width (reduced from 105 for a wider target)
       height: 125, // Balanced goalkeeper height
       speed: 1.8, 
@@ -282,12 +283,17 @@ export default function GameCanvas({ onShotComplete }) {
         }
         st.gk.x = Math.max(leftLimit, Math.min(rightLimit, st.gk.x));
 
-        // GK Jump Logic
+        // GK Jump Logic - Jump ONLY ONCE and ONLY if ball is predicted to be high
         const distanceToGoal = st.ball.baseY - st.goal.lineY;
-        if (distanceToGoal < canvas.height * 0.4 && st.gk.altitude === 0) {
-            // Predict if the ball is high enough to warrant a jump
-            if (st.ball.altitude > st.gk.height * 0.5 && st.ball.vAltitude > -2) {
-                st.gk.vAltitude = Math.min(10, st.ball.altitude * 0.08); // Jump power scales with ball height
+        if (distanceToGoal < 300 && distanceToGoal > 0 && !st.gk.hasJumped) {
+            const timeToGoal = distanceToGoal / Math.max(0.1, Math.abs(st.ball.vBaseY));
+            const predictedAltitude = st.ball.altitude + (st.ball.vAltitude * timeToGoal) - (0.5 * 0.38 * timeToGoal * timeToGoal);
+            
+            if (predictedAltitude > 100) {
+                st.gk.vAltitude = 9.0; // Jump to reach high ball
+                st.gk.hasJumped = true;
+            } else if (distanceToGoal < 150) {
+                st.gk.hasJumped = true; // Decided not to jump for low ball
             }
         }
         
@@ -413,6 +419,7 @@ export default function GameCanvas({ onShotComplete }) {
     st.gk.x = canvas.width / 2;
     st.gk.altitude = 0;
     st.gk.vAltitude = 0;
+    st.gk.hasJumped = false;
   };
 
   // Input Handlers
@@ -466,33 +473,45 @@ export default function GameCanvas({ onShotComplete }) {
     if (dy > -20) return; 
 
     // ARCADE PHYSICS: Purely distance-based velocity (ignores variable touch duration for high consistency)
-    const speedY = Math.max(-6.5, Math.min(-3.5, dy * 0.022)); // Reduced ball speed so it's not too powerful
-    const speedX = dx * 0.045; // Balanced horizontal speed
+    const speedY = Math.max(-6.5, Math.min(-3.5, dy * 0.022));
 
-    // Calculate curve (Magnus effect) based on swipe curvature, normalized by screen/canvas width!
-    let spin = 0;
+    // 1. Initial Direction: Make the ball follow the actual swipe path
+    // We look at the first ~30% of the swipe to determine the initial launch angle
+    let thirdIndex = Math.floor(pts.length / 3);
+    if (thirdIndex < 1) thirdIndex = 1;
+    if (thirdIndex >= pts.length) thirdIndex = pts.length - 1;
+    
+    const thirdPt = pts[thirdIndex];
+    const initialDx = thirdPt.x - startPt.x;
+    const initialDy = thirdPt.y - startPt.y;
+    
+    let projectedDx = dx;
+    if (initialDy < -5) {
+      projectedDx = initialDx * (dy / initialDy);
+    }
+    projectedDx = Math.max(-canvasWidth, Math.min(canvasWidth, projectedDx));
+    const speedX = projectedDx * 0.035; 
+
+    // 2. Curve (Spin): Based on the maximum deviation from a straight line
+    let maxDeviation = 0;
     if (pts.length >= 3) {
-      let totalDev = 0;
-      const lineLen = Math.hypot(dx, dy);
-      
-      if (lineLen > 10) {
-        for (let i = 1; i < pts.length - 1; i++) {
-          const pt = pts[i];
-          const cross = (pt.x - startPt.x) * dy - (pt.y - startPt.y) * dx;
-          totalDev += cross / lineLen; 
+      for (let i = 1; i < pts.length - 1; i++) {
+        const pt = pts[i];
+        const t = (pt.y - startPt.y) / dy;
+        const lineX = startPt.x + t * dx;
+        const deviation = pt.x - lineX; // Positive if swipe bulges right, negative if left
+        
+        if (Math.abs(deviation) > Math.abs(maxDeviation)) {
+          maxDeviation = deviation;
         }
-        const averageDev = totalDev / (pts.length - 2);
-        
-        // Normalize deviation relative to screen/canvas width to guarantee identical feel on small screens
-        const normalizedDev = averageDev / canvasWidth;
-        
-        // Highly responsive, satisfying banana curve (Curves exactly in the direction of visual touch swipe!)
-        // Removed negative sign so that if you swipe left, ball goes left (positive spin)
-        // Increased multiplier to ensure prominent curves on mobile screens
-        spin = (normalizedDev * 28.0); 
-        spin = Math.max(-1.5, Math.min(1.5, spin)); 
       }
     }
+    
+    const normalizedDev = maxDeviation / canvasWidth;
+    // If deviation is positive (bulges right, `)` shape), curve left (negative spin).
+    // If deviation is negative (bulges left, `(` shape), curve right (positive spin).
+    let spin = -normalizedDev * 12.0; 
+    spin = Math.max(-1.2, Math.min(1.2, spin)); 
     
     state.current.ball.isFlying = true;
     state.current.ball.vx = speedX;
