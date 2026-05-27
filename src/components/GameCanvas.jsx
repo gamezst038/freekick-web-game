@@ -35,6 +35,8 @@ export default function GameCanvas({ onShotComplete }) {
       width: 90, // Balanced goalkeeper width (reduced from 105 for a wider target)
       height: 125, // Balanced goalkeeper height
       speed: 1.8, 
+      state: 'idle', // 'idle', 'jumping', 'sliding'
+      flip: false, 
     },
     swipe: {
       isDragging: false,
@@ -51,9 +53,18 @@ export default function GameCanvas({ onShotComplete }) {
     const ctx = canvas.getContext('2d');
     let animationFrameId;
 
-    // Load GK image
+    // Load GK images
     const gkImage = new Image();
     gkImage.src = './Human.webp';
+
+    const gkImageIdle = new Image();
+    gkImageIdle.src = './Idle.webp';
+
+    const gkImageJump = new Image();
+    gkImageJump.src = './Jumping.webp';
+
+    const gkImageSlide = new Image();
+    gkImageSlide.src = './Sliding.webp';
 
     // Load Ball image
     const ballImage = new Image();
@@ -142,23 +153,50 @@ export default function GameCanvas({ onShotComplete }) {
     };
 
     const drawGK = (ctx, gk) => {
-      if (!gkImage.complete) return;
+      let img = gkImageIdle;
+      let drawWidth = gk.width;
+      let drawHeight = gk.height;
+      let drawX = gk.x - drawWidth / 2;
+      let drawY = gk.y - gk.altitude;
+
+      if (gk.state === 'jumping' && gkImageJump.complete) {
+        img = gkImageJump;
+      } else if (gk.state === 'sliding' && gkImageSlide.complete) {
+        img = gkImageSlide;
+        drawWidth = 145; // Wider for sliding
+        drawHeight = 85; // Shorter for sliding
+        drawX = gk.x - drawWidth / 2;
+        const groundY = gk.y + gk.height;
+        drawY = groundY - drawHeight - gk.altitude;
+      } else if (gkImageIdle.complete) {
+        img = gkImageIdle;
+      } else {
+        img = gkImage; // Fallback to legacy Human.webp
+      }
+
+      if (!img || !img.complete) return;
+
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.8)';
       ctx.shadowBlur = 15;
       
-      let drawX = gk.x - gk.width / 2;
-      let drawY = gk.y - gk.altitude; // Offset drawing by altitude
-      
-      // Draw shadow for jumping GK
-      if (gk.altitude > 0) {
+      // Draw shadow for jumping or sliding GK
+      if (gk.altitude > 0 || gk.state === 'sliding') {
         ctx.beginPath();
-        ctx.ellipse(gk.x, gk.y + gk.height - 10, gk.width * 0.6, gk.width * 0.2, 0, 0, Math.PI * 2);
+        const shadowWidth = drawWidth * (gk.state === 'sliding' ? 0.8 : 0.6);
+        ctx.ellipse(gk.x, gk.y + gk.height - 10, shadowWidth, gk.width * 0.2, 0, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0.1, 0.4 - gk.altitude * 0.005)})`;
         ctx.fill();
       }
 
-      ctx.drawImage(gkImage, drawX, drawY, gk.width, gk.height);
+      if (gk.flip) {
+        // Flip horizontally around the goalkeeper's center X
+        ctx.translate(gk.x, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, -drawWidth / 2, drawY, drawWidth, drawHeight);
+      } else {
+        ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+      }
       ctx.restore();
     };
 
@@ -296,16 +334,26 @@ export default function GameCanvas({ onShotComplete }) {
                 st.gk.hasJumped = true; // Decided not to jump for low ball
             }
         }
-        
-        // Apply GK jump physics
-        if (st.gk.altitude > 0 || st.gk.vAltitude !== 0) {
-            st.gk.altitude += st.gk.vAltitude * timeScale;
-            st.gk.vAltitude -= 0.6 * timeScale; // Gravity for GK
-            
-            if (st.gk.altitude < 0) {
-                st.gk.altitude = 0;
-                st.gk.vAltitude = 0;
+
+        // Determine GK animation state and direction flip (updated dynamically in flight)
+        if (st.gk.altitude > 0 || st.gk.vAltitude > 0) {
+          st.gk.state = 'jumping';
+          st.gk.flip = false;
+        } else {
+          // GK slides/dives if ball is close horizontally to the goal line, low altitude, and GK is stretching to reach it
+          if (distanceToGoal < 280 && distanceToGoal > -50) {
+            const gkDistX = st.ball.x - st.gk.x;
+            if (Math.abs(gkDistX) > 20 && st.ball.altitude < 120) {
+              st.gk.state = 'sliding';
+              st.gk.flip = (gkDistX > 0); // Assuming sliding image naturally faces LEFT. Flip if diving RIGHT.
+            } else {
+              st.gk.state = 'idle';
+              st.gk.flip = false;
             }
+          } else {
+            st.gk.state = 'idle';
+            st.gk.flip = false;
+          }
         }
 
         // Goal & Save detection
@@ -390,6 +438,18 @@ export default function GameCanvas({ onShotComplete }) {
         }
       }
 
+      // Apply GK jump physics (always run even after result, so GK lands safely on the ground)
+      if (st.ball.isFlying && (st.gk.altitude > 0 || st.gk.vAltitude !== 0)) {
+        const timeScale = st.slowMotion ? 0.3 : 1;
+        st.gk.altitude += st.gk.vAltitude * timeScale;
+        st.gk.vAltitude -= 0.6 * timeScale; // Gravity for GK
+        
+        if (st.gk.altitude < 0) {
+            st.gk.altitude = 0;
+            st.gk.vAltitude = 0;
+        }
+      }
+
       drawBall(ctx, st.ball);
 
       animationFrameId = requestAnimationFrame(render);
@@ -420,6 +480,8 @@ export default function GameCanvas({ onShotComplete }) {
     st.gk.altitude = 0;
     st.gk.vAltitude = 0;
     st.gk.hasJumped = false;
+    st.gk.state = 'idle';
+    st.gk.flip = false;
   };
 
   // Input Handlers
