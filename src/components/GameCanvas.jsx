@@ -177,17 +177,18 @@ export default function GameCanvas({ onShotComplete, difficulty = 'easy' }) {
       if (!img || !img.complete) return;
 
       ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.8)';
-      ctx.shadowBlur = 15;
+      ctx.shadowColor = 'rgba(0,0,0,0.6)';
+      ctx.shadowBlur = 12;
       
-      // Draw shadow for jumping GK
-      if (gk.altitude > 0) {
-        ctx.beginPath();
-        const shadowWidth = drawWidth * 0.6;
-        ctx.ellipse(gk.x, gk.y + gk.height - 10, shadowWidth, gk.width * 0.2, 0, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0.1, 0.4 - gk.altitude * 0.005)})`;
-        ctx.fill();
-      }
+      // Draw shadow for GK (Idle, Jumping, Sliding)
+      ctx.beginPath();
+      // Reduce shadow width significantly since actual images are not very wide
+      const shadowWidth = drawWidth * (gk.state === 'sliding' ? 0.45 : 0.35);
+      // Position the shadow correctly depending on whether diving or standing
+      const shadowYOffset = gk.state === 'sliding' ? gk.height - 25 : gk.height - 10;
+      ctx.ellipse(gk.x, gk.y + shadowYOffset, shadowWidth, gk.width * 0.15, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0.05, 0.35 - Math.max(0, gk.altitude) * 0.005)})`;
+      ctx.fill();
 
       if (gk.flip) {
         // Flip horizontally around the goalkeeper's center X
