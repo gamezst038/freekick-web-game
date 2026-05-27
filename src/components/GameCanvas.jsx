@@ -28,9 +28,9 @@ export default function GameCanvas({ onShotComplete }) {
     gk: {
       x: 0,
       y: 0,
-      width: 105, // Slightly increased from 95 to cover more goal area
-      height: 135, // Slightly increased from 125
-      speed: 2, 
+      width: 90, // Balanced goalkeeper width (reduced from 105 for a wider target)
+      height: 125, // Balanced goalkeeper height
+      speed: 1.8, 
     },
     swipe: {
       isDragging: false,
@@ -67,9 +67,9 @@ export default function GameCanvas({ onShotComplete }) {
         state.current.ball.scale = 1;
       }
       
-      // Goal dimensions (Narrowed goal size to make scoring more challenging)
-      state.current.goal.width = Math.min(canvas.width * 0.65, 420);
-      state.current.goal.height = 190;
+      // Goal dimensions (Balanced size for satisfying gameplay on mobile)
+      state.current.goal.width = Math.min(canvas.width * 0.75, 460);
+      state.current.goal.height = 200;
       state.current.goal.x = canvas.width / 2;
       state.current.goal.y = canvas.height * 0.35; // Lowered goal to be closer to center of screen
       state.current.goal.lineY = state.current.goal.y + state.current.goal.height;
@@ -438,9 +438,9 @@ export default function GameCanvas({ onShotComplete }) {
         }
         const averageDev = totalDev / (pts.length - 2);
         
-        // Gentle spin scaling to prevent crazy curved trajectories
-        spin = -(averageDev * 0.005); 
-        spin = Math.max(-0.12, Math.min(0.12, spin));
+        // Slightly more pronounced curve for rewarding swipe control
+        spin = -(averageDev * 0.007); 
+        spin = Math.max(-0.15, Math.min(0.15, spin));
       }
     }
     
@@ -450,8 +450,8 @@ export default function GameCanvas({ onShotComplete }) {
     state.current.ball.vAltitude = Math.abs(speedY) * 0.9 + 5; 
     state.current.ball.spin = spin;
     
-    // Set GK speed (slower so it is beatable but slightly more alert)
-    state.current.gk.speed = 1.4 + Math.random() * 2.0;
+    // Set GK speed (slower so it is beatable and satisfying to score)
+    state.current.gk.speed = 1.0 + Math.random() * 1.5;
   };
 
   return (
