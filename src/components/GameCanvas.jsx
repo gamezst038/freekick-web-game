@@ -350,7 +350,8 @@ export default function GameCanvas({ onShotComplete, difficulty = 'easy' }) {
         // Determine GK animation state and direction flip (updated dynamically in flight)
         if (st.gk.altitude > 0 || st.gk.vAltitude > 0) {
           st.gk.state = 'jumping';
-          st.gk.flip = false;
+          const gkDistX = st.ball.x - st.gk.x;
+          st.gk.flip = (gkDistX > 0); // Auto flip if jumping to the right side
         } else {
           // GK slides/dives if ball is close horizontally to the goal line, low altitude, and GK is stretching to reach it
           if (distanceToGoal < 280 && distanceToGoal > -50) {

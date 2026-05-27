@@ -14,7 +14,10 @@ export default function LobbyScreen({ onEnterArena, onOpenSettings }) {
     <>
       <header className="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile md:px-margin-desktop h-16 border-b border-outline-variant/15 shadow-[0_0_15px_rgba(255,246,223,0.1)] transition-all duration-300 ease-in-out bg-surface-container/30 backdrop-blur-md">
         <div className="flex items-center gap-4">
-          <button className="p-2 text-primary hover:glow-primary transition-all duration-300">
+          <button 
+            onClick={() => window.location.href = 'https://liff.line.me/2009692262-Af7Zj1IG'} 
+            className="p-2 text-primary hover:glow-primary transition-all duration-300"
+          >
             <span className="material-symbols-outlined text-[24px]">arrow_back</span>
           </button>
           <h1 className="font-display-hero text-headline-md md:text-headline-md uppercase tracking-tighter text-primary">BITBURGER FREEKICK</h1>
