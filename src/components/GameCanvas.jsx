@@ -232,8 +232,8 @@ export default function GameCanvas({ onShotComplete }) {
         // Slow motion near goal
         const timeScale = st.slowMotion ? 0.3 : 1;
         
-        // Apply Magnus effect (curve) to horizontal velocity (balanced for natural visual curves)
-        st.ball.vx += st.ball.spin * 0.38 * timeScale;
+        // Apply Magnus effect (curve) to horizontal velocity (scaled by canvas width for perfect responsiveness on mobile!)
+        st.ball.vx += st.ball.spin * (canvas.width * 0.0013) * timeScale;
         
         // Update positions
         st.ball.x += st.ball.vx * timeScale;
@@ -416,6 +416,10 @@ export default function GameCanvas({ onShotComplete }) {
     if (!state.current.swipe.isDragging) return;
     state.current.swipe.isDragging = false;
     
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const canvasWidth = canvas.width;
+
     const pts = state.current.swipe.pts;
     if (pts.length < 2) return;
     
@@ -432,7 +436,7 @@ export default function GameCanvas({ onShotComplete }) {
     const speedY = Math.max(-7.8, Math.min(-4.6, dy * 0.026)); // Balanced ball speed for clear visuals and control
     const speedX = dx * 0.045; // Balanced horizontal speed
 
-    // Calculate curve (Magnus effect) based on swipe curvature
+    // Calculate curve (Magnus effect) based on swipe curvature, normalized by screen/canvas width!
     let spin = 0;
     if (pts.length >= 3) {
       let totalDev = 0;
@@ -446,9 +450,12 @@ export default function GameCanvas({ onShotComplete }) {
         }
         const averageDev = totalDev / (pts.length - 2);
         
+        // Normalize deviation relative to screen/canvas width to guarantee identical feel on small screens
+        const normalizedDev = averageDev / canvasWidth;
+        
         // Highly responsive, satisfying banana curve (Curves exactly in the direction of visual touch swipe!)
-        spin = -(averageDev * 0.02); 
-        spin = Math.max(-0.5, Math.min(0.5, spin)); 
+        spin = -(normalizedDev * 13.0); 
+        spin = Math.max(-0.65, Math.min(0.65, spin)); 
       }
     }
     
