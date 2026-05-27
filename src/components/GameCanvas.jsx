@@ -232,8 +232,8 @@ export default function GameCanvas({ onShotComplete }) {
         // Slow motion near goal
         const timeScale = st.slowMotion ? 0.3 : 1;
         
-        // Apply Magnus effect (curve) to horizontal velocity (boosted for arcade curved shots!)
-        st.ball.vx += st.ball.spin * 1.0 * timeScale;
+        // Apply Magnus effect (curve) to horizontal velocity (balanced for natural visual curves)
+        st.ball.vx += st.ball.spin * 0.38 * timeScale;
         
         // Update positions
         st.ball.x += st.ball.vx * timeScale;
@@ -429,8 +429,8 @@ export default function GameCanvas({ onShotComplete }) {
     if (dy > -20) return; 
 
     // ARCADE PHYSICS: Purely distance-based velocity (ignores variable touch duration for high consistency)
-    const speedY = Math.max(-13, Math.min(-6, dy * 0.045)); // Increased power and caps slightly (from -10 and 0.035)
-    const speedX = dx * 0.085; // Adjusted horizontal aiming to match increased shot power
+    const speedY = Math.max(-7.8, Math.min(-4.6, dy * 0.026)); // Balanced ball speed for clear visuals and control
+    const speedX = dx * 0.045; // Balanced horizontal speed
 
     // Calculate curve (Magnus effect) based on swipe curvature
     let spin = 0;
@@ -446,9 +446,9 @@ export default function GameCanvas({ onShotComplete }) {
         }
         const averageDev = totalDev / (pts.length - 2);
         
-        // Highly responsive, satisfying banana curve
-        spin = -(averageDev * 0.03); 
-        spin = Math.max(-0.6, Math.min(0.6, spin)); 
+        // Highly responsive, satisfying banana curve (Curves exactly in the direction of visual touch swipe!)
+        spin = -(averageDev * 0.02); 
+        spin = Math.max(-0.5, Math.min(0.5, spin)); 
       }
     }
     
