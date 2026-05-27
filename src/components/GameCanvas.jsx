@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 
-export default function GameCanvas({ onShotComplete }) {
+export default function GameCanvas({ onShotComplete, difficulty = 'easy' }) {
   const canvasRef = useRef(null);
   
   // Game state
@@ -180,10 +180,10 @@ export default function GameCanvas({ onShotComplete }) {
       ctx.shadowColor = 'rgba(0,0,0,0.8)';
       ctx.shadowBlur = 15;
       
-      // Draw shadow for jumping or sliding GK
-      if (gk.altitude > 0 || gk.state === 'sliding') {
+      // Draw shadow for jumping GK
+      if (gk.altitude > 0) {
         ctx.beginPath();
-        const shadowWidth = drawWidth * (gk.state === 'sliding' ? 0.8 : 0.6);
+        const shadowWidth = drawWidth * 0.6;
         ctx.ellipse(gk.x, gk.y + gk.height - 10, shadowWidth, gk.width * 0.2, 0, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0.1, 0.4 - gk.altitude * 0.005)})`;
         ctx.fill();
@@ -312,12 +312,23 @@ export default function GameCanvas({ onShotComplete }) {
         const gkTargetX = st.ball.x;
         const gkDist = gkTargetX - st.gk.x;
         
+        let speedMultiplier = 1.0;
+        let reachMultiplier = 1.0;
+        
+        if (difficulty === 'normal') {
+          speedMultiplier = 1.3;
+          reachMultiplier = 1.2;
+        } else if (difficulty === 'hard') {
+          speedMultiplier = 2.0;
+          reachMultiplier = 1.8;
+        }
+
         // Ensure GK stays within goal posts
         const leftLimit = st.goal.x - st.goal.width/2 + st.gk.width/2;
         const rightLimit = st.goal.x + st.goal.width/2 - st.gk.width/2;
 
         if (Math.abs(gkDist) > 5) {
-          st.gk.x += Math.sign(gkDist) * Math.min(Math.abs(gkDist), st.gk.speed * timeScale);
+          st.gk.x += Math.sign(gkDist) * Math.min(Math.abs(gkDist), st.gk.speed * speedMultiplier * timeScale);
         }
         st.gk.x = Math.max(leftLimit, Math.min(rightLimit, st.gk.x));
 
@@ -362,9 +373,9 @@ export default function GameCanvas({ onShotComplete }) {
           const rightX = st.goal.x + st.goal.width/2;
           
           // Check collision with GK
-          const hitGkX = Math.abs(st.ball.x - st.gk.x) < (st.gk.width/2 + st.ball.radius*st.ball.scale);
+          const hitGkX = Math.abs(st.ball.x - st.gk.x) < ((st.gk.width/2 + st.ball.radius*st.ball.scale) * reachMultiplier);
           // Hit detection considers GK's current altitude
-          const hitGkY = st.ball.altitude > (st.gk.altitude - 10) && st.ball.altitude < (st.gk.altitude + st.gk.height + 20);
+          const hitGkY = st.ball.altitude > (st.gk.altitude - 10 * reachMultiplier) && st.ball.altitude < (st.gk.altitude + st.gk.height + 20 * reachMultiplier);
 
           if (hitGkX && hitGkY) {
             // SAVED!

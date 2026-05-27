@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function LobbyScreen({ onEnterArena }) {
+export default function LobbyScreen({ onEnterArena, onOpenSettings }) {
   const [connecting, setConnecting] = useState(false);
 
   const handleEnter = () => {
@@ -20,7 +20,7 @@ export default function LobbyScreen({ onEnterArena }) {
           <h1 className="font-display-hero text-headline-md md:text-headline-md uppercase tracking-tighter text-primary">BITBURGER FREEKICK</h1>
         </div>
         <div className="flex items-center gap-6">
-          <button className="flex items-center gap-2 group transition-all duration-300">
+          <button onClick={onOpenSettings} className="flex items-center gap-2 group transition-all duration-300">
             <span className="material-symbols-outlined text-[24px] text-primary group-hover:glow-primary">settings</span>
           </button>
         </div>

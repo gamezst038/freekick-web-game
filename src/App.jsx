@@ -9,6 +9,8 @@ function App() {
   const [shotCount, setShotCount] = useState(0);
   const [goals, setGoals] = useState(0);
   const [history, setHistory] = useState([]); // Array of 'goal', 'save', 'miss'
+  const [difficulty, setDifficulty] = useState('easy'); // 'easy', 'normal', 'hard'
+  const [showSettings, setShowSettings] = useState(false);
 
   const startGame = () => {
     setShotCount(0);
@@ -44,17 +46,18 @@ function App() {
   return (
     <GameContainer>
       {gameState === 'lobby' && (
-        <LobbyScreen onEnterArena={startGame} />
+        <LobbyScreen onEnterArena={startGame} onOpenSettings={() => setShowSettings(true)} />
       )}
       
       {(gameState === 'playing' || gameState === 'goal' || gameState === 'save' || gameState === 'miss') && (
         <div className="absolute inset-0 w-full h-full">
-          <GameCanvas onShotComplete={handleShotComplete} />
+          <GameCanvas onShotComplete={handleShotComplete} difficulty={difficulty} />
           <GameHUD 
             goals={goals} 
             shotCount={shotCount} 
             gameState={gameState} 
             onBack={() => setGameState('lobby')} 
+            onOpenSettings={() => setShowSettings(true)}
           />
         </div>
       )}
@@ -161,6 +164,33 @@ function App() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade-in p-6">
+          <div className="glass-panel max-w-sm w-full p-8 rounded-2xl border border-primary/20 flex flex-col items-center shadow-[0_0_60px_rgba(255,215,0,0.12)]">
+            <h2 className="font-display-hero text-[32px] font-black text-primary uppercase text-center mb-6">SETTINGS</h2>
+            
+            <div className="w-full flex flex-col gap-3 mb-6">
+              <span className="font-label-caps text-primary/60 text-[10px] tracking-[0.3em] uppercase mb-2 text-center">DIFFICULTY</span>
+              
+              <button onClick={() => setDifficulty('easy')} className={`w-full py-3 font-label-caps text-label-caps tracking-widest rounded-full transition-all ${difficulty === 'easy' ? 'bg-primary-container text-on-primary shadow-[0_0_15px_rgba(255,215,0,0.3)]' : 'border border-outline-variant/30 text-primary/80 hover:bg-surface-container-high/40'}`}>
+                EASY
+              </button>
+              <button onClick={() => setDifficulty('normal')} className={`w-full py-3 font-label-caps text-label-caps tracking-widest rounded-full transition-all ${difficulty === 'normal' ? 'bg-primary-container text-on-primary shadow-[0_0_15px_rgba(255,215,0,0.3)]' : 'border border-outline-variant/30 text-primary/80 hover:bg-surface-container-high/40'}`}>
+                NORMAL
+              </button>
+              <button onClick={() => setDifficulty('hard')} className={`w-full py-3 font-label-caps text-label-caps tracking-widest rounded-full transition-all ${difficulty === 'hard' ? 'bg-primary-container text-on-primary shadow-[0_0_15px_rgba(255,215,0,0.3)]' : 'border border-outline-variant/30 text-primary/80 hover:bg-surface-container-high/40'}`}>
+                HARD
+              </button>
+            </div>
+
+            <button onClick={() => setShowSettings(false)} className="w-full py-4 mt-2 border border-outline-variant/30 text-primary/80 font-label-caps text-label-caps tracking-widest rounded-full hover:bg-surface-container-high/40 hover:text-primary active:scale-95 transition-all duration-300">
+              CLOSE
+            </button>
           </div>
         </div>
       )}

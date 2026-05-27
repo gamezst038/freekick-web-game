@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function GameHUD({ goals, shotCount, gameState, onBack }) {
+export default function GameHUD({ goals, shotCount, gameState, onBack, onOpenSettings }) {
   return (
     <div className="absolute inset-0 z-10 pointer-events-none">
       {/* Top Navigation Shell */}
@@ -12,7 +12,7 @@ export default function GameHUD({ goals, shotCount, gameState, onBack }) {
           <h1 className="font-display-hero text-headline-md uppercase tracking-tighter text-primary">BITBURGER FREEKICK</h1>
         </div>
         <div className="flex items-center gap-6">
-          <button className="flex items-center gap-2 group transition-all duration-300">
+          <button onClick={onOpenSettings} className="flex items-center gap-2 group transition-all duration-300">
             <span className="material-symbols-outlined text-[24px] text-primary group-hover:glow-primary">settings</span>
           </button>
         </div>
