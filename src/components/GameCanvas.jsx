@@ -316,12 +316,15 @@ export default function GameCanvas({ onShotComplete, difficulty = 'easy' }) {
         let speedMultiplier = 1.0;
         let reachMultiplier = 1.0;
         
-        if (difficulty === 'normal') {
-          speedMultiplier = 1.3;
-          reachMultiplier = 1.2;
+        if (difficulty === 'easy') {
+          speedMultiplier = 0.45; // Very slow and easy to score
+          reachMultiplier = 0.75; // Small reach
+        } else if (difficulty === 'normal') {
+          speedMultiplier = 1.0;  // Old Easy level
+          reachMultiplier = 1.0;
         } else if (difficulty === 'hard') {
-          speedMultiplier = 2.0;
-          reachMultiplier = 1.8;
+          speedMultiplier = 3.0;  // Extremely fast
+          reachMultiplier = 2.5;  // Massive reach, virtually unbeatable
         }
 
         // Ensure GK stays within goal posts
@@ -340,7 +343,7 @@ export default function GameCanvas({ onShotComplete, difficulty = 'easy' }) {
             const predictedAltitude = st.ball.altitude + (st.ball.vAltitude * timeToGoal) - (0.5 * 0.38 * timeToGoal * timeToGoal);
             
             if (predictedAltitude > 100) {
-                st.gk.vAltitude = 9.0; // Jump to reach high ball
+                st.gk.vAltitude = difficulty === 'hard' ? 12.0 : 9.0; // Jump much higher in Hard difficulty
                 st.gk.hasJumped = true;
             } else if (distanceToGoal < 150) {
                 st.gk.hasJumped = true; // Decided not to jump for low ball
