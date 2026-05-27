@@ -203,29 +203,7 @@ export default function GameCanvas({ onShotComplete }) {
       ctx.restore();
     };
 
-    const drawTrajectory = (ctx, pts, ball) => {
-      if (pts.length < 2) return;
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)'; // gold dotted line
-      ctx.lineWidth = 4;
-      ctx.setLineDash([10, 10]);
-      ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
-      ctx.shadowBlur = 10;
-      
-      const startY = ball.baseY - ball.altitude;
-      
-      ctx.beginPath();
-      ctx.moveTo(ball.x, startY);
-      const currentPt = pts[pts.length - 1];
-      const startPt = pts[0];
-      const dx = currentPt.x - startPt.x;
-      const dy = currentPt.y - startPt.y;
-      
-      // Project the line forward
-      ctx.lineTo(ball.x + dx * 2, startY + dy * 2);
-      ctx.stroke();
-      ctx.restore();
-    };
+    // drawTrajectory removed as requested for a cleaner, professional mini-game look
 
     const render = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -239,14 +217,11 @@ export default function GameCanvas({ onShotComplete }) {
       ctx.fillRect(0,0, canvas.width, canvas.height);
       ctx.restore();
 
+      // Render background vignette and stadium lights
       drawGoal(ctx, state.current.goal);
       drawGK(ctx, state.current.gk);
       
       const st = state.current;
-      
-      if (st.swipe.isDragging) {
-        drawTrajectory(ctx, st.swipe.pts, st.ball);
-      }
 
       // Physics update
       if (st.ball.isFlying && !st.result) {
@@ -260,8 +235,8 @@ export default function GameCanvas({ onShotComplete }) {
         st.ball.x += st.ball.vx * timeScale;
         st.ball.baseY += st.ball.vBaseY * timeScale; // Moves "into" the screen
         
-        // Gravity effect on altitude
-        st.ball.vAltitude -= 0.6 * timeScale; // Gravity
+        // Gravity effect on altitude (creates a beautiful rising and dipping parabolic arc)
+        st.ball.vAltitude -= 0.38 * timeScale; // Balanced gravity decay
         st.ball.altitude += st.ball.vAltitude * timeScale;
         
         // Bounce off the ground
@@ -416,15 +391,15 @@ export default function GameCanvas({ onShotComplete }) {
     
     const dx = endPt.x - startPt.x;
     const dy = endPt.y - startPt.y;
-    const dt = Math.max(1, endPt.time - startPt.time);
     
+    // Only shoot if swiped UP
     if (dy > -20) return; 
 
-    // VERY SLOW SPEED
-    const speedY = Math.min(-3, Math.max(-12, (dy / dt) * 3));
-    const speedX = (dx / dt) * 2;
+    // ARCADE PHYSICS: Purely distance-based velocity (ignores variable touch duration for high consistency)
+    const speedY = Math.max(-10, Math.min(-5, dy * 0.035)); // Consistent forward speed
+    const speedX = dx * 0.07; // Highly sensitive horizontal aiming (fixes stiff steering)
 
-    // Calculate curve (Magnus effect)
+    // Calculate curve (Magnus effect) based on swipe curvature
     let spin = 0;
     if (pts.length >= 3) {
       let totalDev = 0;
@@ -438,16 +413,19 @@ export default function GameCanvas({ onShotComplete }) {
         }
         const averageDev = totalDev / (pts.length - 2);
         
-        // Slightly more pronounced curve for rewarding swipe control
-        spin = -(averageDev * 0.007); 
-        spin = Math.max(-0.15, Math.min(0.15, spin));
+        // Highly responsive, satisfying banana curve
+        spin = -(averageDev * 0.015); 
+        spin = Math.max(-0.25, Math.min(0.25, spin)); 
       }
     }
     
     state.current.ball.isFlying = true;
     state.current.ball.vx = speedX;
     state.current.ball.vBaseY = speedY; 
-    state.current.ball.vAltitude = Math.abs(speedY) * 0.9 + 5; 
+    
+    // vAltitude for initial lob (creates the rise, gravity does the dip)
+    state.current.ball.vAltitude = Math.abs(speedY) * 1.35; 
+    
     state.current.ball.spin = spin;
     
     // Set GK speed (slower so it is beatable and satisfying to score)
