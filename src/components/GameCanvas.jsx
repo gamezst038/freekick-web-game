@@ -290,11 +290,17 @@ export default function GameCanvas({ onShotComplete }) {
             // GOAL! (Strict check: ball altitude must be strictly below crossbar/goal.height)
             st.slowMotion = true;
             st.result = 'goal';
+            
+            // Instantly apply net collision physics! (dampen speed, start dropping immediately)
+            st.ball.vBaseY = -0.5; // Stop moving deep into screen
+            st.ball.vx *= 0.15;    // Drastically slow down sideways movement
+            st.ball.vAltitude = -1.5; // Drop down straight into the net
+            
             onShotComplete('goal');
             
             setTimeout(() => {
               resetBall(st, canvas);
-            }, 2000); 
+            }, 2500); 
           } else {
             // MISS!
             st.result = 'miss';
@@ -306,15 +312,19 @@ export default function GameCanvas({ onShotComplete }) {
           }
         }
       } else if (st.result) {
-        // Ball bounce/fall physics after result
-        st.ball.x += st.ball.vx * 0.5;
-        st.ball.baseY += st.ball.vBaseY * 0.5;
-        st.ball.vAltitude -= 0.6;
+        // Ball bounce/fall physics after result (Goal net dampening or Saved bounce)
+        const decay = st.result === 'goal' ? 0.3 : 0.5; 
+        st.ball.x += st.ball.vx * decay;
+        st.ball.baseY += st.ball.vBaseY * decay;
+        st.ball.vAltitude -= 0.5; // Gravity pull
         st.ball.altitude += st.ball.vAltitude;
+        
+        // Bounce on the grass inside the net or ground
         if (st.ball.altitude < 0) {
            st.ball.altitude = 0;
-           st.ball.vAltitude = Math.abs(st.ball.vAltitude) * 0.4;
-           st.ball.vx *= 0.8;
+           st.ball.vAltitude = Math.abs(st.ball.vAltitude) * 0.3; // Soft bounce
+           st.ball.vx *= 0.65; // High grass friction
+           st.ball.vBaseY *= 0.65;
         }
       }
 
