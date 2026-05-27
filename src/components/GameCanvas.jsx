@@ -29,6 +29,8 @@ export default function GameCanvas({ onShotComplete }) {
     gk: {
       x: 0,
       y: 0,
+      altitude: 0, // Added altitude for jumping
+      vAltitude: 0,
       width: 90, // Balanced goalkeeper width (reduced from 105 for a wider target)
       height: 125, // Balanced goalkeeper height
       speed: 1.8, 
@@ -145,8 +147,16 @@ export default function GameCanvas({ onShotComplete }) {
       ctx.shadowBlur = 15;
       
       let drawX = gk.x - gk.width / 2;
-      let drawY = gk.y;
+      let drawY = gk.y - gk.altitude; // Offset drawing by altitude
       
+      // Draw shadow for jumping GK
+      if (gk.altitude > 0) {
+        ctx.beginPath();
+        ctx.ellipse(gk.x, gk.y + gk.height - 10, gk.width * 0.6, gk.width * 0.2, 0, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0.1, 0.4 - gk.altitude * 0.005)})`;
+        ctx.fill();
+      }
+
       ctx.drawImage(gkImage, drawX, drawY, gk.width, gk.height);
       ctx.restore();
     };
@@ -272,6 +282,26 @@ export default function GameCanvas({ onShotComplete }) {
         }
         st.gk.x = Math.max(leftLimit, Math.min(rightLimit, st.gk.x));
 
+        // GK Jump Logic
+        const distanceToGoal = st.ball.baseY - st.goal.lineY;
+        if (distanceToGoal < canvas.height * 0.4 && st.gk.altitude === 0) {
+            // Predict if the ball is high enough to warrant a jump
+            if (st.ball.altitude > st.gk.height * 0.5 && st.ball.vAltitude > -2) {
+                st.gk.vAltitude = Math.min(10, st.ball.altitude * 0.08); // Jump power scales with ball height
+            }
+        }
+        
+        // Apply GK jump physics
+        if (st.gk.altitude > 0 || st.gk.vAltitude !== 0) {
+            st.gk.altitude += st.gk.vAltitude * timeScale;
+            st.gk.vAltitude -= 0.6 * timeScale; // Gravity for GK
+            
+            if (st.gk.altitude < 0) {
+                st.gk.altitude = 0;
+                st.gk.vAltitude = 0;
+            }
+        }
+
         // Goal & Save detection
         if (st.ball.baseY <= st.goal.lineY) {
           const leftX = st.goal.x - st.goal.width/2;
@@ -279,7 +309,8 @@ export default function GameCanvas({ onShotComplete }) {
           
           // Check collision with GK
           const hitGkX = Math.abs(st.ball.x - st.gk.x) < (st.gk.width/2 + st.ball.radius*st.ball.scale);
-          const hitGkY = st.ball.altitude < st.gk.height;
+          // Hit detection considers GK's current altitude
+          const hitGkY = st.ball.altitude > (st.gk.altitude - 10) && st.ball.altitude < (st.gk.altitude + st.gk.height + 20);
 
           if (hitGkX && hitGkY) {
             // SAVED!
@@ -380,6 +411,8 @@ export default function GameCanvas({ onShotComplete }) {
     st.slowMotion = false;
     st.result = null;
     st.gk.x = canvas.width / 2;
+    st.gk.altitude = 0;
+    st.gk.vAltitude = 0;
   };
 
   // Input Handlers
@@ -455,8 +488,9 @@ export default function GameCanvas({ onShotComplete }) {
         
         // Highly responsive, satisfying banana curve (Curves exactly in the direction of visual touch swipe!)
         // Removed negative sign so that if you swipe left, ball goes left (positive spin)
-        spin = (normalizedDev * 13.0); 
-        spin = Math.max(-0.65, Math.min(0.65, spin)); 
+        // Increased multiplier to ensure prominent curves on mobile screens
+        spin = (normalizedDev * 28.0); 
+        spin = Math.max(-1.5, Math.min(1.5, spin)); 
       }
     }
     
