@@ -433,7 +433,7 @@ export default function GameCanvas({ onShotComplete }) {
     if (dy > -20) return; 
 
     // ARCADE PHYSICS: Purely distance-based velocity (ignores variable touch duration for high consistency)
-    const speedY = Math.max(-7.8, Math.min(-4.6, dy * 0.026)); // Balanced ball speed for clear visuals and control
+    const speedY = Math.max(-6.5, Math.min(-3.5, dy * 0.022)); // Reduced ball speed so it's not too powerful
     const speedX = dx * 0.045; // Balanced horizontal speed
 
     // Calculate curve (Magnus effect) based on swipe curvature, normalized by screen/canvas width!
@@ -454,7 +454,8 @@ export default function GameCanvas({ onShotComplete }) {
         const normalizedDev = averageDev / canvasWidth;
         
         // Highly responsive, satisfying banana curve (Curves exactly in the direction of visual touch swipe!)
-        spin = -(normalizedDev * 13.0); 
+        // Removed negative sign so that if you swipe left, ball goes left (positive spin)
+        spin = (normalizedDev * 13.0); 
         spin = Math.max(-0.65, Math.min(0.65, spin)); 
       }
     }
