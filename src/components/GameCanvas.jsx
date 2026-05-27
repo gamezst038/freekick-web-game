@@ -447,6 +447,9 @@ export default function GameCanvas({ onShotComplete }) {
         if (st.gk.altitude < 0) {
             st.gk.altitude = 0;
             st.gk.vAltitude = 0;
+            // Always return to idle state upon landing
+            st.gk.state = 'idle';
+            st.gk.flip = false;
         }
       }
 
@@ -534,8 +537,22 @@ export default function GameCanvas({ onShotComplete }) {
     // Only shoot if swiped UP
     if (dy > -20) return; 
 
-    // ARCADE PHYSICS: Purely distance-based velocity (ignores variable touch duration for high consistency)
-    const speedY = Math.max(-6.5, Math.min(-3.5, dy * 0.022));
+    // Calculate swipe velocity (pixels per ms)
+    const duration = Math.max(10, endPt.time - startPt.time);
+    const swipeSpeed = Math.abs(dy) / duration; // pixels/ms
+    
+    // ARCADE PHYSICS: Purely distance-based velocity, but scale speed limit for extremely fast/hard swipes
+    let maxSpeedY = -6.5;
+    let altitudeMult = 1.85;
+    
+    if (swipeSpeed > 2.0 && Math.abs(dy) > 200) {
+      // Scale maxSpeedY up to -9.0 for fast swipes
+      maxSpeedY = -6.5 - Math.min(2.5, (swipeSpeed - 2.0) * 1.5);
+      // Scale up the altitude multiplier so the ball easily flies over the crossbar
+      altitudeMult = 1.85 + Math.min(0.5, (swipeSpeed - 2.0) * 0.3);
+    }
+    
+    const speedY = Math.max(maxSpeedY, Math.min(-3.5, dy * 0.022));
 
     // 1. Initial Direction: Make the ball follow the actual swipe path
     // We look at the first ~30% of the swipe to determine the initial launch angle
@@ -580,7 +597,7 @@ export default function GameCanvas({ onShotComplete }) {
     state.current.ball.vBaseY = speedY; 
     
     // vAltitude for initial lob (Higher multiplier so hard kicks fly over the crossbar)
-    state.current.ball.vAltitude = Math.abs(speedY) * 1.85; 
+    state.current.ball.vAltitude = Math.abs(speedY) * altitudeMult; 
     
     state.current.ball.spin = spin;
     
