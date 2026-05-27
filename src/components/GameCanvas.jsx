@@ -245,12 +245,12 @@ export default function GameCanvas({ onShotComplete }) {
           st.ball.vAltitude = Math.abs(st.ball.vAltitude) * 0.12; // Grass dampening (reduced from 0.4)
         }
         
-        // Perspective scaling
+        // Perspective scaling (ball scales down smaller at the goal line for a strong 3D depth effect)
         const startY = canvas.height - 150;
         const travelDistance = startY - st.goal.lineY;
         const currentTravel = startY - st.ball.baseY;
         const travelRatio = Math.max(0, Math.min(1.2, currentTravel / travelDistance));
-        st.ball.scale = Math.max(0.3, 1 - (travelRatio * 0.6));
+        st.ball.scale = Math.max(0.18, 1 - (travelRatio * 0.78)); // Decreased minimum scale from 0.3 to 0.18
 
         // AI Goalkeeper Logic
         // Move towards the ball's predicted X, but limit speed
@@ -406,8 +406,8 @@ export default function GameCanvas({ onShotComplete }) {
     if (dy > -20) return; 
 
     // ARCADE PHYSICS: Purely distance-based velocity (ignores variable touch duration for high consistency)
-    const speedY = Math.max(-10, Math.min(-5, dy * 0.035)); // Consistent forward speed
-    const speedX = dx * 0.07; // Highly sensitive horizontal aiming (fixes stiff steering)
+    const speedY = Math.max(-13, Math.min(-6, dy * 0.045)); // Increased power and caps slightly (from -10 and 0.035)
+    const speedX = dx * 0.085; // Adjusted horizontal aiming to match increased shot power
 
     // Calculate curve (Magnus effect) based on swipe curvature
     let spin = 0;
@@ -438,8 +438,8 @@ export default function GameCanvas({ onShotComplete }) {
     
     state.current.ball.spin = spin;
     
-    // Set GK speed (slower so it is beatable and satisfying to score)
-    state.current.gk.speed = 1.0 + Math.random() * 1.5;
+    // Set GK speed (increased slightly to match faster shot speed)
+    state.current.gk.speed = 1.3 + Math.random() * 1.8;
   };
 
   return (
