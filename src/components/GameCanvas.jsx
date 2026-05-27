@@ -5,7 +5,7 @@ export default function GameCanvas({ onShotComplete }) {
   
   // Game state
   const state = useRef({
-    ball: {
+      ball: {
       x: 0,
       y: 0,
       baseY: 0,
@@ -15,6 +15,7 @@ export default function GameCanvas({ onShotComplete }) {
       vBaseY: 0,
       vAltitude: 0,
       scale: 1,
+      alpha: 1, // Added alpha for fade-out effect on missed/high shots
       isFlying: false,
       spin: 0,
     },
@@ -159,7 +160,9 @@ export default function GameCanvas({ onShotComplete }) {
 
       // Drop shadow scaling with height
       const shadowScale = Math.max(0.2, 1 - (ball.altitude / 300));
-      const shadowAlpha = Math.max(0.1, ball.scale * 0.5 * shadowScale);
+      const shadowAlpha = Math.max(0.1, ball.scale * 0.5 * shadowScale) * ball.alpha;
+      
+      ctx.globalAlpha = ball.alpha; // Apply alpha to the entire ball rendering
       
       ctx.beginPath();
       ctx.ellipse(ball.x, shadowY, currentRadius * 0.8 * shadowScale, currentRadius * 0.3 * shadowScale, 0, 0, Math.PI * 2);
@@ -201,6 +204,7 @@ export default function GameCanvas({ onShotComplete }) {
       }
 
       ctx.restore();
+      ctx.globalAlpha = 1.0; // Reset global alpha
     };
 
     // drawTrajectory removed as requested for a cleaner, professional mini-game look
@@ -228,8 +232,8 @@ export default function GameCanvas({ onShotComplete }) {
         // Slow motion near goal
         const timeScale = st.slowMotion ? 0.3 : 1;
         
-        // Apply Magnus effect (curve) to horizontal velocity (slowed down curve acceleration)
-        st.ball.vx += st.ball.spin * 0.15 * timeScale;
+        // Apply Magnus effect (curve) to horizontal velocity (boosted for arcade curved shots!)
+        st.ball.vx += st.ball.spin * 1.0 * timeScale;
         
         // Update positions
         st.ball.x += st.ball.vx * timeScale;
@@ -245,12 +249,14 @@ export default function GameCanvas({ onShotComplete }) {
           st.ball.vAltitude = Math.abs(st.ball.vAltitude) * 0.12; // Grass dampening (reduced from 0.4)
         }
         
-        // Perspective scaling (ball scales down smaller at the goal line for a strong 3D depth effect)
+        // Perspective scaling
         const startY = canvas.height - 150;
         const travelDistance = startY - st.goal.lineY;
         const currentTravel = startY - st.ball.baseY;
-        const travelRatio = Math.max(0, Math.min(1.2, currentTravel / travelDistance));
-        st.ball.scale = Math.max(0.18, 1 - (travelRatio * 0.78)); // Decreased minimum scale from 0.3 to 0.18
+        const travelRatio = Math.max(0, currentTravel / travelDistance);
+        
+        st.ball.scale = Math.max(0.18, 1 - (travelRatio * 0.78));
+        st.ball.alpha = 1.0;
 
         // AI Goalkeeper Logic
         // Move towards the ball's predicted X, but limit speed
@@ -312,19 +318,38 @@ export default function GameCanvas({ onShotComplete }) {
           }
         }
       } else if (st.result) {
-        // Ball bounce/fall physics after result (Goal net dampening or Saved bounce)
-        const decay = st.result === 'goal' ? 0.3 : 0.5; 
-        st.ball.x += st.ball.vx * decay;
-        st.ball.baseY += st.ball.vBaseY * decay;
-        st.ball.vAltitude -= 0.5; // Gravity pull
-        st.ball.altitude += st.ball.vAltitude;
-        
-        // Bounce on the grass inside the net or ground
-        if (st.ball.altitude < 0) {
-           st.ball.altitude = 0;
-           st.ball.vAltitude = Math.abs(st.ball.vAltitude) * 0.12; // Soft grass bounce (reduced from 0.3)
-           st.ball.vx *= 0.65; // High grass friction
-           st.ball.vBaseY *= 0.65;
+        if (st.result === 'miss') {
+          // MISS PHYSICS: Keep flying away, getting smaller and smaller, and fading out
+          st.ball.x += st.ball.vx;
+          st.ball.baseY += st.ball.vBaseY;
+          st.ball.altitude += st.ball.vAltitude;
+          
+          st.ball.vAltitude -= 0.38; // Normal gravity effect
+
+          const startY = canvas.height - 150;
+          const travelDistance = startY - st.goal.lineY;
+          const currentTravel = startY - st.ball.baseY;
+          const travelRatio = Math.max(1.0, currentTravel / travelDistance);
+
+          // Get the base scale at the goal line (approx 1 - 0.78 = 0.22)
+          const baseScale = 1 - 0.78; 
+          st.ball.scale = Math.max(0, baseScale * Math.max(0, 1 - (travelRatio - 1.0) * 1.5));
+          st.ball.alpha = Math.max(0, 1 - (travelRatio - 1.0) * 2.0);
+        } else {
+          // Goal net dampening or Saved bounce
+          const decay = st.result === 'goal' ? 0.3 : 0.5; 
+          st.ball.x += st.ball.vx * decay;
+          st.ball.baseY += st.ball.vBaseY * decay;
+          st.ball.vAltitude -= 0.5; // Gravity pull
+          st.ball.altitude += st.ball.vAltitude;
+          
+          // Bounce on the grass inside the net or ground
+          if (st.ball.altitude < 0) {
+             st.ball.altitude = 0;
+             st.ball.vAltitude = Math.abs(st.ball.vAltitude) * 0.12; 
+             st.ball.vx *= 0.65; 
+             st.ball.vBaseY *= 0.65;
+          }
         }
       }
 
@@ -347,6 +372,7 @@ export default function GameCanvas({ onShotComplete }) {
     st.ball.baseY = canvas.height - 150;
     st.ball.altitude = 0;
     st.ball.scale = 1;
+    st.ball.alpha = 1.0;
     st.ball.vx = 0;
     st.ball.vBaseY = 0;
     st.ball.vAltitude = 0;
@@ -382,11 +408,8 @@ export default function GameCanvas({ onShotComplete }) {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     
+    // KEEP ALL POINTS (Removed array shifting to capture the full visual curve from start to end of swipe!)
     state.current.swipe.pts.push({ x: clientX, y: clientY, time: Date.now() });
-    
-    if (state.current.swipe.pts.length > 15) {
-      state.current.swipe.pts.shift();
-    }
   };
 
   const handlePointerUp = (e) => {
@@ -424,8 +447,8 @@ export default function GameCanvas({ onShotComplete }) {
         const averageDev = totalDev / (pts.length - 2);
         
         // Highly responsive, satisfying banana curve
-        spin = -(averageDev * 0.015); 
-        spin = Math.max(-0.25, Math.min(0.25, spin)); 
+        spin = -(averageDev * 0.03); 
+        spin = Math.max(-0.6, Math.min(0.6, spin)); 
       }
     }
     
